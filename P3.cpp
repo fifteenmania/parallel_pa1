@@ -3,8 +3,14 @@
 #include <iostream>
 #include <sys/time.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <math.h>
+#define NUM_THREADS 6
 
-#define NUM_THREADS 12
+struct sparse_mtx *Sm;
+struct dense_mtx *Dm;
+struct dense_mtx *Em;
+int partition_sheet[NUM_THREADS];
 
 bool
 SCsrMatrixfromFile(struct sparse_mtx *A, const char* filePath)
@@ -87,22 +93,92 @@ void multiply_single(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx
     for (i=0; i<A->nrow-1; i++){
         for (j=A->row[i];j<(uint32_t)A->row[i+1];j++){
             col_idx = A->col[j];
-            C->val[i*(C->ncol)+col_idx] += (A->val[col_idx])*(B->val[col_idx*(B->ncol)+i]);
+            C->val[i*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+i]);
         }
     }
     // last row handling
     for (j=A->row[i];j<(uint32_t)A->ncol;j++){
         col_idx = A->col[j];
-        C->val[i*(C->ncol)+col_idx] += (A->val[col_idx])*(B->val[col_idx*(B->ncol)+i]);
+        C->val[i*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+i]);
     }
+}
+
+void *multiply_row(void *tnum_p)
+{
+    uint32_t col_idx;
+    int tnum = *((int *)tnum_p);
+    uint32_t st_idx = (tnum>0) ? partition_sheet[tnum-1] : 0;
+    uint32_t ed_idx = partition_sheet[tnum];
+    std::cout << "from " << st_idx << " to  " << ed_idx << std::endl;
+    for (uint32_t i=st_idx; i<ed_idx; i++){
+        for (uint32_t j=Sm->row[i]; j<(uint32_t)Sm->row[i+1]; j++){
+            col_idx = Sm->col[j];
+            Em->val[i*(Em->ncol)+col_idx] += (Sm->val[j])*(Dm->val[col_idx*(Dm->ncol)+i]);
+        }
+    }
+    return NULL;
 }
 
 void multiply_pthread(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx *C)
 {
     // TODO: Implement matrix multiplication with pthread. C=A*B
-    uint32_t col_idx = 0;
-    uint32_t i, j;
-     
+    uint32_t col_idx;
+    // workload distribution
+    uint32_t ideal_workload = A->nnze/NUM_THREADS;
+    uint32_t workload = 0;
+    int sheet_idx = 0;
+    for (uint32_t i=0; i<A->nrow-1; i++){
+        workload += (A->row[i+1]-A->row[i]);
+        if (workload > ideal_workload){
+             partition_sheet[sheet_idx] = i;
+             workload = 0;
+             sheet_idx += 1;
+        }
+    }
+    for (int j=sheet_idx; j<NUM_THREADS; j++){
+        partition_sheet[j] = A->nrow-1;
+    }
+    /* this block is for printing partition sheet
+     * for (int j=0; j<NUM_THREADS; j++){
+        std::cout << partition_sheet[j] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << A->nrow << std::endl;*/
+
+    // threads initialization
+    pthread_t p_threads[NUM_THREADS];
+    Sm = A;
+    Dm = B;
+    Em = C;   
+    int tnum[NUM_THREADS];
+    for (int j=0; j<NUM_THREADS; j++){
+        tnum[j] = j;
+    }
+    // create threads
+    for (int j=0; j<NUM_THREADS; j++){
+        pthread_create(&p_threads[j], NULL, multiply_row, (void *)(&tnum[j]));
+    }
+    for (int j=0; j<NUM_THREADS; j++){
+        pthread_join(p_threads[j], NULL);
+    }
+    // last row handling
+    for (uint32_t j=A->row[A->nrow-1];j<(uint32_t)A->ncol;j++){
+        col_idx = A->col[j];
+        C->val[(A->nrow-1)*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+(A->nrow-1)]);
+    }
+    return;
+}
+
+double residual_diff(struct dense_mtx *A, struct dense_mtx *B)
+{
+    double residual;
+    double residual_sum = 0;
+    uint32_t size = A->nrow*A->ncol;
+    for (uint32_t i=0; i<size; i++){
+        residual = A->val[i] - B->val[i];
+        residual_sum += residual*residual;
+    }
+    return sqrt(residual_sum/size);
 }
 
 void init_zeros(struct dense_mtx *A, uint32_t nrow, uint32_t ncol)
@@ -170,6 +246,8 @@ int main(int argc, char **argv)
     std::cout << "Multi Thread Computation End: " << time_elapse(start, end) << " us." << std::endl;
 
     // TODO: Testing Code by comparing C1 and C2
+    double diff = residual_diff(&C1, &C2);
+    std::cout << "residual : " << diff << std::endl;
 
     free(A.row);
     free(A.col);

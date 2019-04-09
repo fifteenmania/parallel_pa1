@@ -204,7 +204,7 @@ int Matrix::num_threads = 0;
 int Matrix::size = 0;
 int Matrix::ppvt = 0;
 int Matrix::cur_col = 0;
-pthread_barrier_t Matrix::barrier;
+//pthread_barrier_t Matrix::barrier;
 
 Matrix::Matrix() 
 {
@@ -545,7 +545,7 @@ void *Matrix::_set_gauss_elim_par_help(void *tnum_p)
     int tnum = *((int*)tnum_p);
     for (int i=cur_col+tnum+1; i<n; i+=num_threads){
         a = Ad[i*n+cur_col]/Ad[cur_col*n+cur_col];
-        for (int j=i; j<n; j++){
+        for (int j=cur_col; j<n; j++){
             Ad[i*n+j] -= a*Ad[cur_col*n+j];
         }
         Bd[i] -= a*Bd[cur_col];
@@ -615,7 +615,7 @@ void Matrix::set_gauss_elim(Vector *V)
     }
     return;
 }
-
+/*
 void *Matrix::_set_backsub_par_help(void *tnum_p)
 {
     int n = Matrix::size;
@@ -679,7 +679,7 @@ void Matrix::set_backsub_par(Vector *V, int p)
     Matrix::size = 0;
     Matrix::num_threads = 0;
     return;
-}
+}*/
 
 void Matrix::set_backsub(Vector *V)
 {

@@ -40,15 +40,13 @@ int main(int argc, char **argv)
     b0 = b;
 
     struct timespec begin, end;
-    A.print();
-    clock_gettime(CLOCK_MONOTONIC, &begin);
-    A.set_gauss_elim_par(&b, p);
-    A.print();
-    A.set_backsub(&b);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    cout << "Single:      " << time_elapse(begin, end) << " ms" << endl;
+    //clock_gettime(CLOCK_MONOTONIC, &begin);
+    //clock_gettime(CLOCK_MONOTONIC, &end);
+    //cout << "Single:      " << time_elapse(begin, end) << " ms" << endl;
 
     clock_gettime(CLOCK_MONOTONIC, &begin);
+    A.set_gauss_elim_par(&b, p);
+    A.set_backsub(&b);
     clock_gettime(CLOCK_MONOTONIC, &end);
     cout << "Parallel:    " << time_elapse(begin, end) << " ms" << endl;
     

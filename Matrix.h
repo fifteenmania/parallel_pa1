@@ -52,7 +52,7 @@ public:
     static int num_threads;
     static int ppvt;
     static int cur_col;
-    static pthread_barrier_t barrier;
+    //static pthread_barrier_t barrier;
 
     Matrix();
     Matrix(double *data, int n);
