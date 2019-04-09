@@ -1,7 +1,12 @@
 20184269 Taehee Kim PA1
 2019. 4. 8.
 
-<How to use makefile>
+This is solution for CS402 "Parallel Computing" PA1.
+Includes parallel implimentations for dense matrix multiplication, Gaussian elimination, and sparse x dense matrix multiplication.
+
+
+
+< How to use makefile >
 
 $ make 
 : complie codes for all problems.
@@ -9,12 +14,38 @@ $ make
 $ make clean
 : clean up object files.
 
+$ testset[1~4]
+: test P3 for five different sparce matrix file("testset1" is bundle of "test1" ~ "test5").
 
-<Code Description>
+$ test[1~20]
+: test P3 for example sparse matrix file.
+
+
+
+< Code Description >
 
 #1. Dense Matrix Multiplication
 
+Excutable  : [P1]
 Dependency : [Matrix.cpp] [Matrix.h] [P1.cpp]
+input      : ./P1 [n : size of matrix] [p : number of threads]
+output     : ...
 
 In [Matrix.cpp], there's common definitions for problem 1 and 2. 
+
+
+
+#2. Gaussian Elimination
+
+Excutable  : [P2]
+Dependency : [Matrix.cpp] [Matrix.h] [P2.cpp]
+input      : ./P2 [n : size of matrix] [p : number of threads]
+output     : ...
+
+
+
+#3. Sparse x Dense Matrix Multiplication
+
+
+
 
