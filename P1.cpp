@@ -28,7 +28,7 @@ int main(int argc, char **argv)
         cout << "Invalid input" << endl;
         return 0;
     }
-    if (p<1 || p>1024){
+    if (p<1 || p>512){
         cout << "Invalid input" << endl;
         return 0;
     }

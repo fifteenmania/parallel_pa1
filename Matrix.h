@@ -3,7 +3,11 @@
 #include <stdlib.h>
 #include <iomanip>
 #include <pthread.h>
-#define MAX_THREADS 1024
+#include <cstring>
+#include <math.h>
+#include <limits>
+#include <cstddef>
+#define MAX_THREADS 512
 #define SIM_THRES 0.0001
 #define BLK_SIZE 32
 
@@ -18,12 +22,14 @@ public:
     Vector(double *, int);
     Vector(const Vector &V);
     ~Vector();
+    Vector &operator = (const Vector &other);
     // initialization
     int init_zeros(int);
     int init_ones(int);
     int init_rand(int, int);
     inline double *read_data();
     bool is_equal(const Vector &V);
+    double residual_diff(const Vector &V);
     bool is_similar(const Vector &V);
     void print();
     void swaprow(int, int);
@@ -50,6 +56,7 @@ public:
     Matrix(double *data, int n);
     Matrix(const Matrix &M);
     ~Matrix();
+    Matrix &operator = (const Matrix &other);
     // initialization
     int init_zeros(int);
     int init_ones(int);

@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -Wall -O1 -g
+CFLAGS = -Wall -O3 -g
 LDLIBS = -lpthread
 RM = rm -f
 
@@ -20,5 +20,5 @@ test3 :
 	./P3 ./matrix/2cubes_sphere.mtx 2048
 
 
-.clean : 
+clean : 
 	$(RM) P1 P2 P3

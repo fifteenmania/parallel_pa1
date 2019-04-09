@@ -1,6 +1,13 @@
 #include "Matrix.h"
 
 using namespace std;
+
+
+// ********************************************
+// Vector class definition
+// ***********************************************
+
+
 Vector::Vector()
 {
     this->n = 0;
@@ -12,7 +19,16 @@ Vector::Vector(double *data, int n)
     this->n = n;
     this->data = data;
 }
-
+Vector::Vector(const Vector &V)
+{
+    int n = V.n;
+    double *Vd = V.data;
+    double *data = (double *)malloc(n*sizeof(double));
+    memcpy(data, Vd, n*sizeof(double));
+    this->n = n;
+    this->data = data;
+}
+/*
 Vector::Vector(const Vector &V)
 {
     int n = V.n;
@@ -24,7 +40,7 @@ Vector::Vector(const Vector &V)
     this->n = n;
     this->data = data;
 }
-
+*/
 Vector::~Vector()
 {
     if (this->data){
@@ -32,6 +48,20 @@ Vector::~Vector()
     }
     this->data = NULL;
     this->n = 0;
+}
+
+Vector& Vector::operator = (const Vector& other)
+{
+    if (this != &other){
+        int n = other.n;
+        double *Vd = other.data;
+        double *data = (double *)malloc(n*sizeof(double));
+        memcpy(data, Vd, n*sizeof(double));
+        this->n = n;
+        this->data = data;
+        return *this;
+    }
+    return *this;
 }
 
 int Vector::init_zeros(int n)
@@ -92,6 +122,26 @@ double *Vector::read_data()
     return this->data;
 }
 
+double Vector::residual_diff(const Vector &V)
+{
+    int n = V.n;
+    if (this->n != n){
+        return std::numeric_limits<double>::max();
+    }
+    double residual;
+    double residual_sum = 0;
+    for (int i=0; i<n; i++){
+        residual = V.data[i] - this->data[i];
+        residual_sum += residual*residual;
+    }
+    return sqrt(residual_sum/n);
+}
+
+bool Vector::is_similar(const Vector &V)
+{
+    return residual_diff(V) < SIM_THRES;
+}
+
 void Vector::print()
 {
     int n = this->n;
@@ -146,6 +196,7 @@ Vector Vector::vmult(Matrix *A)
 // Matrix class definition
 // **************************************************
 
+
 double *Matrix::Ad = NULL;
 double *Matrix::Bd = NULL;
 double *Matrix::Cd = NULL;
@@ -170,9 +221,7 @@ Matrix::Matrix(const Matrix &M)
     double *A;
     this->n = n;
     A = (double*) malloc(n*n*sizeof(double));
-    for (int i=0; i<n*n; i++){
-        A[i] = M.data[i];
-    }
+    memcpy(A, M.data, n*n*sizeof(double));
     this->data = A;
 }
 
@@ -183,6 +232,20 @@ Matrix::~Matrix()
     }
     this->data = NULL;
     this->n = 0;
+}
+
+Matrix &Matrix::operator = (const Matrix &other)
+{
+    if (this != &other){
+        int n = other.n;
+        double *A;
+        this->n = n;
+        A = (double*) malloc(n*n*sizeof(double));
+        memcpy(A, other.data, n*n*sizeof(double));
+        this->data = A;
+        return *this;
+    }
+    return *this;
 }
 
 int Matrix::init_zeros(int n)
@@ -247,7 +310,7 @@ void Matrix::print()
 {
     int n = this->n;
     double *A = this->data;
-    cout << setprecision(3)<< fixed;
+    cout << setprecision(10)<< fixed;
     for (int i=0; i<n; i++){
         for (int j=0; j<n; j++){
             cout << A[n*i+j] << " ";
@@ -256,6 +319,23 @@ void Matrix::print()
     }
     return;
 }
+
+bool Matrix::is_similar(const Matrix &B)
+{
+    int n = this->n;
+    double *lhsd = this->data;
+    double *rhsd = B.data;
+    if (n != B.n){
+        return false;
+    }
+    double residual_sum = 0, residual;
+    for (int i=0; i<n*n; i++){
+        residual = rhsd[i]-lhsd[i];
+        residual_sum += residual*residual;
+    }
+    return (residual_sum/n/n) < SIM_THRES; 
+}
+
 
 bool Matrix::is_equal(const Matrix &B)
 {
@@ -439,14 +519,15 @@ void Matrix::submultrow(int row1, int row2, double a)
 }
 int Matrix::pivotrow(int col)
 {
-    // find maximal row with given pivot(partial pivot)
+    // find maximal row with given column(partial pivot)
+    // return -1 if no nonzero entry.
     int n = this->n;
     double *A = this->data;
     int pivot_row = -1;
-    int pivot_max = 0;
+    double pivot_max = 0;
     for (int i=col; i<n; i++){
-        if (A[i*n+col]>pivot_max){
-            pivot_max = A[i*n+col];
+        if (fabs(A[i*n+col])>pivot_max){
+            pivot_max = abs(A[i*n+col]);
             pivot_row = i;
         }
     }
@@ -488,7 +569,7 @@ void Matrix::set_backsub(Vector *V)
         if (A[i*n+i] != 0){
             a = Xd[i]/A[i*n+i];
             Xd[i] = a;
-            for (int j=i+1; j<n; j++){
+            for (int j=i-1; j>=0; j--){
                 Xd[j] -= A[j*n+i]*a;
             }
         }

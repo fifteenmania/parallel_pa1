@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdlib.h>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std;
 
@@ -16,8 +18,8 @@ double time_elapse(struct timespec begin, struct timespec end)
 int main(int argc, char **argv)
 {
     int n, p;
-    Matrix A, B, C;
-    Matrix D;
+    Matrix A, A0;
+    Vector b, b0;
     if (argc !=3){
         cout << "Usage: ./P1 [n]:size of matrix [p]:number of threads" << endl;
         return 0;
@@ -28,25 +30,29 @@ int main(int argc, char **argv)
         cout << "Invalid input" << endl;
         return 0;
     }
-    if (p<1 || p>1024){
+    if (p<1 || p>512){
         cout << "Invalid input" << endl;
         return 0;
     }
-    A.init_rand(n, 10);
-    B.init_rand(n, 20);
-    C.init_zeros(n);
-    D.init_zeros(n);
+    A.init_rand(n, time(NULL));
+    A0 = A;
+    b.init_rand(n, time(NULL));
+    b0 = b;
 
     struct timespec begin, end;
     clock_gettime(CLOCK_MONOTONIC, &begin);
-    C.set_mmult_ordered(A, B);
+    A.set_gauss_elim(&b);
     clock_gettime(CLOCK_MONOTONIC, &end);
-    cout << "Single:   " << time_elapse(begin, end) << " ms" << endl;
-    
+    cout << "Single:      " << time_elapse(begin, end) << " ms" << endl;
+
     clock_gettime(CLOCK_MONOTONIC, &begin);
-    D.set_mmult_par(A, B, p);
     clock_gettime(CLOCK_MONOTONIC, &end);
-    cout << "Parallel: " << time_elapse(begin, end) << " ms" << endl;
-    cout << "Correctness: " << C.is_equal(D) << endl;
+    cout << "Parallel:    " << time_elapse(begin, end) << " ms" << endl;
+    
+    A.set_backsub(&b);
+    b = b.vmult(&A0);
+    double resid = b.residual_diff(b0);
+    cout << "Residual:    " << resid << endl;
+    cout << "Correctness: " << (resid<SIM_THRES) << endl;
     return 0;
 }
