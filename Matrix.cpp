@@ -202,6 +202,9 @@ double *Matrix::Bd = NULL;
 double *Matrix::Cd = NULL;
 int Matrix::num_threads = 0;
 int Matrix::size = 0;
+int Matrix::ppvt = 0;
+int Matrix::cur_col = 0;
+pthread_barrier_t Matrix::barrier;
 
 Matrix::Matrix() 
 {
@@ -517,6 +520,7 @@ void Matrix::submultrow(int row1, int row2, double a)
     }
     return;
 }
+
 int Matrix::pivotrow(int col)
 {
     // find maximal row with given column(partial pivot)
@@ -532,6 +536,61 @@ int Matrix::pivotrow(int col)
         }
     }
     return pivot_row;
+}
+
+void *Matrix::_set_gauss_elim_par_help(void *tnum_p)
+{
+    double a;
+    int n = size;
+    int tnum = *((int*)tnum_p);
+    for (int i=cur_col+tnum+1; i<n; i+=num_threads){
+        a = Ad[i*n+cur_col]/Ad[cur_col*n+cur_col];
+        for (int j=i; j<n; j++){
+            Ad[i*n+j] -= a*Ad[cur_col*n+j];
+        }
+        Bd[i] -= a*Bd[cur_col];
+    }
+    return NULL;
+}
+
+void Matrix::set_gauss_elim_par(Vector *V, int p)
+{
+    // set this, V as echelon form
+    // Modify V and this
+    pthread_t p_threads[MAX_THREADS];
+    int pivot_row;
+    int n = this->n;
+    int tnum[MAX_THREADS];
+    for (int i=0; i<p; i++){
+        tnum[i] = i;
+    }
+    Ad = this->data;
+    Bd = V->data;
+    size = n;
+    num_threads = p;
+    for (int i=0; i<n-1; i++){
+        pivot_row = this->pivotrow(i);
+        if (pivot_row != -1){
+            ppvt = pivot_row;
+            cur_col = i;
+            this->swaprow(i, pivot_row);
+            V->swaprow(i, pivot_row);
+            for (int j=0; j<p; j++){
+                pthread_create(&p_threads[j], NULL, Matrix::_set_gauss_elim_par_help, (void *)&(tnum[j]));
+            }
+            for (int j=0; j<p; j++){
+                pthread_join(p_threads[j], NULL);
+            }
+            /*this->swaprow(i, pivot_row);
+            V->swaprow(i, pivot_row);
+            for (int j=i+1; j<n; j++){
+                a = A[j*n+i]/A[i*n+i];
+                this->submultrow(i,j,a);
+                V->submultrow(i,j,a);
+            }*/
+        }
+    }
+    return;
 }
 
 void Matrix::set_gauss_elim(Vector *V)
@@ -554,6 +613,71 @@ void Matrix::set_gauss_elim(Vector *V)
             }
         }
     }
+    return;
+}
+
+void *Matrix::_set_backsub_par_help(void *tnum_p)
+{
+    int n = Matrix::size;
+    double *A = Matrix::Ad;
+    double *X = Matrix::Bd;
+    int p = Matrix::num_threads;
+    int tnum = *(int*)tnum_p;
+    double a;
+    int st_idx, ed_idx;
+    for (int i=n-1; i>=LINE_SIZE; i--){
+        if (A[i*n+i] != 0){
+            a = X[i]/A[i*n+i];
+            X[i] = a;
+            st_idx = (tnum*i)/p;
+            ed_idx = ((tnum+1)*i)/p;
+            for (int j=st_idx; j<ed_idx; j++){
+                X[j] -= A[j*n+i]*a;
+            }
+        }
+        pthread_barrier_wait(&(Matrix::barrier));
+    } 
+    return NULL;
+}
+
+void Matrix::set_backsub_par(Vector *V, int p)
+{
+    Matrix::Ad = this->data;
+    Matrix::Bd = V->data;
+    Matrix::size = this->n;
+    Matrix::num_threads = p;
+
+    int tnum[MAX_THREADS];
+    for (int i=0; i<p; i++){
+        tnum[i] = i;
+    }
+    
+    pthread_t p_threads[MAX_THREADS];
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_barrier_init(&Matrix::barrier, NULL, p);
+    for (int k=0; k<p; k++){
+        pthread_create(&p_threads[k], &attr, &Matrix::_set_backsub_par_help, (void *)&tnum[k]);
+    }
+    for (int l=0; l<p; l++){
+        pthread_join(p_threads[l], NULL);
+    }
+    double a;
+    // do remaining small tasks in single thread mode
+    for (int m=min(LINE_SIZE, n-1); m>=0; m--){
+        if (Ad[m*n+m] != 0){
+            a = Bd[m]/Ad[m*n+m];
+            Bd[m] = a;
+            for (int q=m-1; q>=0; q--){
+                Bd[q] -= Ad[q*n+m]*a;
+            }
+        }
+    }
+
+    Matrix::Ad = NULL;
+    Matrix::Bd = NULL;
+    Matrix::size = 0;
+    Matrix::num_threads = 0;
     return;
 }
 

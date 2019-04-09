@@ -40,8 +40,11 @@ int main(int argc, char **argv)
     b0 = b;
 
     struct timespec begin, end;
+    A.print();
     clock_gettime(CLOCK_MONOTONIC, &begin);
-    A.set_gauss_elim(&b);
+    A.set_gauss_elim_par(&b, p);
+    A.print();
+    A.set_backsub(&b);
     clock_gettime(CLOCK_MONOTONIC, &end);
     cout << "Single:      " << time_elapse(begin, end) << " ms" << endl;
 
@@ -49,7 +52,6 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_MONOTONIC, &end);
     cout << "Parallel:    " << time_elapse(begin, end) << " ms" << endl;
     
-    A.set_backsub(&b);
     b = b.vmult(&A0);
     double resid = b.residual_diff(b0);
     cout << "Residual:    " << resid << endl;

@@ -10,14 +10,14 @@
 #define MAX_THREADS 512
 #define SIM_THRES 0.0001
 #define BLK_SIZE 32
+#define LINE_SIZE 512
 
 class Matrix;
 
 class Vector{
-private:
+public:
     int n;
     double *data;
-public:
     Vector();
     Vector(double *, int);
     Vector(const Vector &V);
@@ -41,17 +41,19 @@ public:
 };
 
 class Matrix{
-private:
+public:
     int n;
     double *data;
-public:
     // static variables for multithread multiplication
     static double *Ad;
     static double *Bd;
     static double *Cd;
     static int size;
     static int num_threads;
-    
+    static int ppvt;
+    static int cur_col;
+    static pthread_barrier_t barrier;
+
     Matrix();
     Matrix(double *data, int n);
     Matrix(const Matrix &M);
@@ -77,7 +79,12 @@ public:
     void multrow(int, double);
     void submultrow(int, int, double);
     int pivotrow(int);
+    static void *_set_gauss_elim_par_help(void *);
+    void set_gauss_elim_par(Vector *V, int p);
     void set_gauss_elim(Vector *);
+    static void *_set_backsub_par_help(void *);
+    void set_backsub_par(Vector *, int p);
     void set_backsub(Vector *);
 };
+
 

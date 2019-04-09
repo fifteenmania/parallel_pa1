@@ -4,10 +4,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-//#define DEBUG
-#ifdef DEBUG
-    #include <csignal>
-#endif
 #define NUM_THREADS 12
 
 bool
