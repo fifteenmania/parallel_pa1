@@ -89,17 +89,16 @@ void multiply_single(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx
 {
     // TODO: Implement matrix multiplication with single thread. C=A*B
     uint32_t col_idx = 0;
-    uint32_t i, j;
-    for (i=0; i<A->nrow-1; i++){
-        for (j=A->row[i];j<(uint32_t)A->row[i+1];j++){
+    for (uint32_t i=0; i<A->nrow; i++){
+        for (uint32_t j=A->row[i];j<(uint32_t)A->row[i+1];j++){
             col_idx = A->col[j];
-            C->val[i*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+i]);
+            for (uint32_t k=0; k<B->ncol; k++){
+                C->val[i*(C->ncol)+k] += (A->val[j])*(B->val[col_idx*(B->ncol)+k]);
+            //if (((col_idx*(B->ncol)+i) > bsize)){
+            //    std::cout << "idx out of bound" << std::endl;
+            //}
+            }
         }
-    }
-    // last row handling
-    for (j=A->row[i];j<(uint32_t)A->ncol;j++){
-        col_idx = A->col[j];
-        C->val[i*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+i]);
     }
 }
 
@@ -109,11 +108,13 @@ void *multiply_row(void *tnum_p)
     int tnum = *((int *)tnum_p);
     uint32_t st_idx = (tnum>0) ? partition_sheet[tnum-1] : 0;
     uint32_t ed_idx = partition_sheet[tnum];
-    std::cout << "from " << st_idx << " to  " << ed_idx << std::endl;
+    //std::cout << "from " << st_idx << " to  " << ed_idx << std::endl;
     for (uint32_t i=st_idx; i<ed_idx; i++){
         for (uint32_t j=Sm->row[i]; j<(uint32_t)Sm->row[i+1]; j++){
             col_idx = Sm->col[j];
-            Em->val[i*(Em->ncol)+col_idx] += (Sm->val[j])*(Dm->val[col_idx*(Dm->ncol)+i]);
+            for (uint32_t k=0; k<Dm->ncol; k++){
+                Em->val[i*(Em->ncol)+k] += (Sm->val[j])*(Dm->val[col_idx*(Dm->ncol)+k]);
+            }
         }
     }
     return NULL;
@@ -122,12 +123,12 @@ void *multiply_row(void *tnum_p)
 void multiply_pthread(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx *C)
 {
     // TODO: Implement matrix multiplication with pthread. C=A*B
-    uint32_t col_idx;
+    //uint32_t col_idx;
     // workload distribution
     uint32_t ideal_workload = A->nnze/NUM_THREADS;
     uint32_t workload = 0;
     int sheet_idx = 0;
-    for (uint32_t i=0; i<A->nrow-1; i++){
+    for (uint32_t i=0; i<A->nrow; i++){
         workload += (A->row[i+1]-A->row[i]);
         if (workload > ideal_workload){
              partition_sheet[sheet_idx] = i;
@@ -136,7 +137,7 @@ void multiply_pthread(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mt
         }
     }
     for (int j=sheet_idx; j<NUM_THREADS; j++){
-        partition_sheet[j] = A->nrow-1;
+        partition_sheet[j] = A->nrow;
     }
     /* this block is for printing partition sheet
      * for (int j=0; j<NUM_THREADS; j++){
@@ -161,24 +162,39 @@ void multiply_pthread(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mt
     for (int j=0; j<NUM_THREADS; j++){
         pthread_join(p_threads[j], NULL);
     }
+    /*
     // last row handling
     for (uint32_t j=A->row[A->nrow-1];j<(uint32_t)A->ncol;j++){
         col_idx = A->col[j];
         C->val[(A->nrow-1)*(C->ncol)+col_idx] += (A->val[j])*(B->val[col_idx*(B->ncol)+(A->nrow-1)]);
-    }
+    }*/
+    Sm = NULL;
+    Dm = NULL;
+    Em = NULL;
     return;
 }
 
-double residual_diff(struct dense_mtx *A, struct dense_mtx *B)
+float residual_diff(struct dense_mtx *A, struct dense_mtx *B)
 {
-    double residual;
-    double residual_sum = 0;
-    uint32_t size = A->nrow*A->ncol;
+    float residual;
+    float residual_sum = 0;
+    uint32_t size = (A->nrow)*(A->ncol);
     for (uint32_t i=0; i<size; i++){
         residual = A->val[i] - B->val[i];
         residual_sum += residual*residual;
     }
-    return sqrt(residual_sum/size);
+    return sqrt(residual_sum/(float)size);
+}
+
+bool mat_equal(struct dense_mtx *A, struct dense_mtx *B)
+{
+    uint32_t size = (A->nrow)*(A->ncol);
+    for (uint32_t i=0; i<size; i++){
+        if (A->val[i] != B->val[i]){
+            return false;
+        }
+    }
+    return true;
 }
 
 void init_zeros(struct dense_mtx *A, uint32_t nrow, uint32_t ncol)
@@ -193,7 +209,7 @@ void init_zeros(struct dense_mtx *A, uint32_t nrow, uint32_t ncol)
 
 double time_elapse(struct timespec start, struct timespec end) {
     double time = end.tv_sec - start.tv_sec;
-    time = time*1000000 + (double)(end.tv_nsec - start.tv_nsec)/1000;
+    time = time + (double)(end.tv_nsec - start.tv_nsec)/1000000000;
     return time;
 }
 
@@ -238,16 +254,15 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_MONOTONIC, &start);
     multiply_single(&A, &B, &C1);
     clock_gettime(CLOCK_MONOTONIC, &end);
-    std::cout << "Single Thread Computation End: " << time_elapse(start, end)  << " us." << std::endl;
+    std::cout << "Single Thread Computation End: " << time_elapse(start, end)  << " s." << std::endl;
     std::cout << "Multi Thread Computation Start" << std::endl;
     clock_gettime(CLOCK_MONOTONIC, &start);
     multiply_pthread(&A, &B, &C2);
     clock_gettime(CLOCK_MONOTONIC, &end);
-    std::cout << "Multi Thread Computation End: " << time_elapse(start, end) << " us." << std::endl;
+    std::cout << "Multi Thread Computation End: " << time_elapse(start, end) << " s." << std::endl;
 
     // TODO: Testing Code by comparing C1 and C2
-    double diff = residual_diff(&C1, &C2);
-    std::cout << "residual : " << diff << std::endl;
+    std::cout << "correctness : " << mat_equal(&C1, &C2) << std::endl;
 
     free(A.row);
     free(A.col);
