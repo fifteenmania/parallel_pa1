@@ -15,7 +15,7 @@ $ make clean
 : clean up object files.
 
 $ testset[1~4]
-: test P3 for five different sparce matrix file("testset1" is bundle of "test1" ~ "test5").
+: test P3 for five different sparce matrix file(ex) "testset1" is bundle of "test1" ~ "test5").
 
 $ test[1~20]
 : test P3 for example sparse matrix file.
