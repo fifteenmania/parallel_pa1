@@ -1,7 +1,7 @@
 20184269 Taehee Kim PA1
 2019. 4. 8.
 
-This is solution for CS402 "Parallel Computing" PA1.
+This is solution for CS492 "Parallel Computing" PA1 in KAIST.
 Includes parallel implimentations for dense matrix multiplication, Gaussian elimination, and sparse x dense matrix multiplication.
 
 

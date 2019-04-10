@@ -34,14 +34,14 @@ int main(int argc, char **argv)
     }
     A.init_rand(n, 10);
     B.init_rand(n, 20);
-    C.init_zeros(n);
+    //C.init_zeros(n);
     D.init_zeros(n);
 
     struct timespec begin, end;
-    clock_gettime(CLOCK_MONOTONIC, &begin);
-    C.set_mmult_ordered(A, B);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    cout << "Single:   " << time_elapse(begin, end) << " ms" << endl;
+    //clock_gettime(CLOCK_MONOTONIC, &begin);
+    //C.set_mmult_ordered(A, B);
+    //clock_gettime(CLOCK_MONOTONIC, &end);
+    //cout << "Single:   " << time_elapse(begin, end) << " ms" << endl;
     
     clock_gettime(CLOCK_MONOTONIC, &begin);
     D.set_mmult_par(A, B, p);
