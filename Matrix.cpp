@@ -204,6 +204,7 @@ int Matrix::num_threads = 0;
 int Matrix::size = 0;
 int Matrix::ppvt = 0;
 int Matrix::cur_col = 0;
+double Matrix::coeff = 0;
 //pthread_barrier_t Matrix::barrier;
 
 Matrix::Matrix() 
@@ -383,8 +384,8 @@ void *Matrix::_set_mmult_par_help(void *tnum_p)
     int nt = Matrix::num_threads;
     int n = Matrix::size;
     int tnum = *((int *)tnum_p);
-    int st = (int)((double)(tnum*n)/(double)nt);
-    int ed = (int)((double)((tnum+1)*n)/(double)nt);
+    int st = (tnum*n)/nt;
+    int ed = ((tnum+1)*n)/nt;
     for (int i=st; i<ed; i++){
         for (int j=0; j<n; j++){
             for (int k=0; k<n; k++){
@@ -615,71 +616,78 @@ void Matrix::set_gauss_elim(Vector *V)
     }
     return;
 }
-/*
+
+int Matrix::umat_rank()
+{
+    // calculate rank for upper triangular matrix
+    int rank = this->n;
+    for (int i=n-1; i>=0; i--){
+        if (this->data[i*n+i] == 0){
+            rank -= 1;
+        }else{
+            return rank;
+        }
+    }
+    return rank;
+}
+
 void *Matrix::_set_backsub_par_help(void *tnum_p)
 {
-    int n = Matrix::size;
-    double *A = Matrix::Ad;
-    double *X = Matrix::Bd;
-    int p = Matrix::num_threads;
-    int tnum = *(int*)tnum_p;
-    double a;
-    int st_idx, ed_idx;
-    for (int i=n-1; i>=LINE_SIZE; i--){
-        if (A[i*n+i] != 0){
-            a = X[i]/A[i*n+i];
-            X[i] = a;
-            st_idx = (tnum*i)/p;
-            ed_idx = ((tnum+1)*i)/p;
-            for (int j=st_idx; j<ed_idx; j++){
-                X[j] -= A[j*n+i]*a;
-            }
-        }
-        pthread_barrier_wait(&(Matrix::barrier));
-    } 
+    int tnum = *((int *)tnum_p);
+    int st_idx = (cur_col*tnum)/num_threads;
+    int ed_idx = (cur_col*(tnum+1))/num_threads;
+    for (int i=st_idx; i<ed_idx; i++){
+        Bd[i] -= Ad[i*size+cur_col]*coeff;
+    }
     return NULL;
 }
+        
 
 void Matrix::set_backsub_par(Vector *V, int p)
 {
-    Matrix::Ad = this->data;
-    Matrix::Bd = V->data;
-    Matrix::size = this->n;
-    Matrix::num_threads = p;
-
+    size = this->n;
+    Ad = this->data;
+    Bd = V->data;
+    int n = size;
+    // pthread initialization
+    pthread_t p_threads[MAX_THREADS];
     int tnum[MAX_THREADS];
     for (int i=0; i<p; i++){
         tnum[i] = i;
     }
-    
-    pthread_t p_threads[MAX_THREADS];
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_barrier_init(&Matrix::barrier, NULL, p);
-    for (int k=0; k<p; k++){
-        pthread_create(&p_threads[k], &attr, &Matrix::_set_backsub_par_help, (void *)&tnum[k]);
-    }
-    for (int l=0; l<p; l++){
-        pthread_join(p_threads[l], NULL);
-    }
+    // backsub routine
     double a;
-    // do remaining small tasks in single thread mode
-    for (int m=min(LINE_SIZE, n-1); m>=0; m--){
-        if (Ad[m*n+m] != 0){
-            a = Bd[m]/Ad[m*n+m];
-            Bd[m] = a;
-            for (int q=m-1; q>=0; q--){
-                Bd[q] -= Ad[q*n+m]*a;
-            }
+    int rank = this->umat_rank();
+    // multithread mode
+    for (int i=rank-1; i>(2*LINE_SIZE); i--){
+        a = Bd[i]/Ad[i*n+i];
+        Bd[i] = a;
+        num_threads = min(i/LINE_SIZE, p);
+        cur_col = i;
+        coeff = a;
+        for (int j=0; j<num_threads; j++){
+            pthread_create(&p_threads[j], NULL, Matrix::_set_backsub_par_help, (void *)&(tnum[j]));
+        }
+        for (int j=0; j<num_threads; j++){
+            pthread_join(p_threads[j], NULL);
         }
     }
-
-    Matrix::Ad = NULL;
-    Matrix::Bd = NULL;
-    Matrix::size = 0;
-    Matrix::num_threads = 0;
+    // singlethread mode
+    for (int i=min(rank-1, 2*LINE_SIZE); i>=0; i--){
+        a = Bd[i]/Ad[i*n+i];
+        Bd[i] = a;
+        for (int j=0; j<i; j++){
+            Bd[j] -= Ad[j*n+i]*a;
+        }
+    }
+    size = 0;
+    num_threads = 0;
+    ppvt = 0;
+    Ad = NULL;
+    Bd = NULL;
     return;
-}*/
+}
+            
 
 void Matrix::set_backsub(Vector *V)
 {
@@ -687,15 +695,14 @@ void Matrix::set_backsub(Vector *V)
     // modify V
     int n = this->n;
     double *A = this->data;
-    double *Xd = V->read_data();
+    double *Xd = V->data;
     double a;
-    for (int i=n-1; i>=0; i--){
-        if (A[i*n+i] != 0){
-            a = Xd[i]/A[i*n+i];
-            Xd[i] = a;
-            for (int j=i-1; j>=0; j--){
-                Xd[j] -= A[j*n+i]*a;
-            }
+    int rank = this->umat_rank();
+    for (int i=rank-1; i>=0; i--){
+        a = Xd[i]/A[i*n+i];
+        Xd[i] = a;
+        for (int j=i-1; j>=0; j--){
+            Xd[j] -= A[j*n+i]*a;
         }
     }       
     return;

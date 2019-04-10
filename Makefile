@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -Wall -O3 -g
+CFLAGS = -Wall -g -O3
 LDLIBS = -lpthread
 RM = rm -f
 

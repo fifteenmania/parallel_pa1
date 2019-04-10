@@ -8,9 +8,9 @@
 #include <limits>
 #include <cstddef>
 #define MAX_THREADS 512
-#define SIM_THRES 0.0001
+#define SIM_THRES 0.000001
 #define BLK_SIZE 32
-#define LINE_SIZE 512
+#define LINE_SIZE 1024
 
 class Matrix;
 
@@ -48,6 +48,7 @@ public:
     static double *Ad;
     static double *Bd;
     static double *Cd;
+    static double coeff;
     static int size;
     static int num_threads;
     static int ppvt;
@@ -77,11 +78,13 @@ public:
     // Gaussian elimination
     void swaprow(int, int);
     void multrow(int, double);
-    void submultrow(int, int, double);
+    inline void submultrow(int, int, double);
     int pivotrow(int);
     static void *_set_gauss_elim_par_help(void *);
     void set_gauss_elim_par(Vector *V, int p);
     void set_gauss_elim(Vector *);
+    
+    int umat_rank();
     static void *_set_backsub_par_help(void *);
     void set_backsub_par(Vector *, int p);
     void set_backsub(Vector *);
