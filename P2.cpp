@@ -34,9 +34,9 @@ int main(int argc, char **argv)
         cout << "Invalid input" << endl;
         return 0;
     }
-    A.init_rand(n, 0);//time(NULL));
+    A.init_rand(n, time(NULL));
     A0 = A;
-    b.init_rand(n, 1);//time(NULL));
+    b.init_rand(n, time(NULL));
     b0 = b;
 
     struct timespec begin, end;
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     //A.set_gauss_elim_par(&b, p);
     clock_gettime(CLOCK_MONOTONIC, &begin);
     A.set_gauss_elim_par(&b, p);
-    A.set_backsub(&b, p);
+    A.set_backsub(&b);
     clock_gettime(CLOCK_MONOTONIC, &end);
     cout << "Parallel:    " << time_elapse(begin, end) << " ms" << endl;
     

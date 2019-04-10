@@ -544,7 +544,9 @@ void *Matrix::_set_gauss_elim_par_help(void *tnum_p)
     double a;
     int n = size;
     int tnum = *((int*)tnum_p);
-    for (int i=cur_col+tnum+1; i<n; i+=num_threads){
+    int st_idx = cur_col + 1 + (tnum*(n-cur_col-1))/num_threads;
+    int ed_idx = cur_col + 1 + ((tnum+1)*(n-cur_col-1))/num_threads;
+    for (int i=st_idx; i<ed_idx; i++){
         a = Ad[i*n+cur_col]/Ad[cur_col*n+cur_col];
         for (int j=cur_col; j<n; j++){
             Ad[i*n+j] -= a*Ad[cur_col*n+j];
